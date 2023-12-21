@@ -21,8 +21,11 @@ import org.springframework.web.bind.annotation.RestController;
 import org.web3j.crypto.Credentials;
 import org.web3j.protocol.Web3j;
 import org.web3j.tx.ClientTransactionManager;
+import org.web3j.tx.RawTransactionManager;
 import org.web3j.tx.TransactionManager;
+import org.web3j.tx.PrivateTransactionManager;
 import org.web3j.protocol.core.methods.response.Web3ClientVersion;
+import org.web3j.protocol.core.methods.response.TransactionReceipt;
 import org.web3j.protocol.http.HttpService;
 import org.web3j.tx.gas.ContractGasProvider;
 
@@ -31,18 +34,20 @@ import org.web3j.tx.gas.ContractGasProvider;
 public class apisolidityControler {
 	
 	final Logger LOG = Logger.getLogger("eu.eurotechtls.geotrack.apisolidity.Controler");
-	final String URL = "http://127.0.0.1:7545";
+	//final String URL = "http://141.94.208.126:8545";
+	//final String URL = "http://127.0.0.1:7545";
+	final String URL = "http://37.59.27.182:8545";
 	
 	//Proveedor de gas por defecto
     ContractGasProvider contractGasProvider = new ContractGasProvider() {
         @Override
         public BigInteger getGasPrice(String contractFunction) {
-            return new BigInteger("20000000000");
+            return new BigInteger("0"); //20000000000
         }
 
         @Override
         public BigInteger getGasPrice() {
-            return new BigInteger("20000000000");
+            return new BigInteger("0"); //20000000000
         }
 
         @Override
@@ -81,9 +86,13 @@ public class apisolidityControler {
         }
     }
 	
-	/****************************************/
-	/*                HUELLA                */
-	/****************************************/
+	/********************************************************************/	
+	/* Leer huella => 											*/
+	/* 1. Usar como propietario la PvKey que se recibe por parámetro 	*/
+	/* 2. Conectar con la red Besu										*/
+	/* 3. Desplegar el contrato Huella_sol_Huella						*/
+	/* 4. Devolver la dirección del contrato							*/
+	/********************************************************************/
 		
 	@GetMapping("/huellas")
 	public ResponseEntity<List<String>> findHuellas() {
@@ -93,9 +102,9 @@ public class apisolidityControler {
 		LOG.log(Level.INFO,"Buscando huellas: " );
 		// Conexión con la red besu usando el nodo de la empresa:
         //String url = "http://141.94.208.126:8545";
-        String url = "http://127.0.0.1:7545";
-        Web3j web3 = Web3j.build(new HttpService(url));
-        LOG.log(Level.INFO,url + " " + " Protocolo: " + web3.ethProtocolVersion().getId());
+        //String url = "http://127.0.0.1:7545";
+        Web3j web3 = Web3j.build(new HttpService(URL));
+        LOG.log(Level.INFO,URL + " " + " Protocolo: " + web3.ethProtocolVersion().getId());
         try {
             Web3ClientVersion web3ClientVersion = web3.web3ClientVersion().send();
             String clientVersion = web3ClientVersion.getWeb3ClientVersion();
@@ -110,12 +119,11 @@ public class apisolidityControler {
         Credentials credentials = cuenta.usarCuenta("0x5f88ac17c4bc1375899f35ee6730219ffcb1648e0d5cbe649f1ef39365ee2914");
         System.out.println("Cuenta: " + credentials.getAddress());
         
-        
-        
+         
         
 		//Obtener el contrato
         LOG.log(Level.INFO,"Dirección de la cuenta : " + credentials.getAddress());
-        Huella_sol_Huella document = new Huella_sol_Huella("0xf6eb3116269103bb8bec3d130a471b567b21ff86", web3, credentials, contractGasProvider);
+        Huella_sol_Huella document = new Huella_sol_Huella("0xbcdc6b18be15ef4e8a7184a1b4727ce9ef3bc310", web3, credentials, contractGasProvider);
         LOG.log(Level.INFO,"Dirección del contrato : " + document.getContractAddress());
        try {
     	   LOG.log(Level.INFO,"Propietario del contrato : " + document.owner().send());
@@ -146,8 +154,8 @@ public class apisolidityControler {
 	}
 
 	/********************************************************************/	
-	/* Desplegar contreato => 											*/
-	/* 1. Usar coo propietario la PvKey que se recibe por parámetro 	*/
+	/* Desplegar contrato => 											*/
+	/* 1. Usar como propietario la PvKey que se recibe por parámetro 	*/
 	/* 2. Conectar con la red Besu										*/
 	/* 3. Desplegar el contrato Huella_sol_Huella						*/
 	/* 4. Devolver la dirección del contrato							*/
@@ -163,26 +171,49 @@ public class apisolidityControler {
 		Credentials credentials = cuenta.usarCuenta(owner);
 		
 		Web3j web3 = obtenWeb3(URL);
+		long chainId = 2022;
         
-		TransactionManager transactionManager = new ClientTransactionManager(web3, credentials.getAddress());
+		//TransactionManager transactionManager = new RawTransactionManager(web3, credentials);
+		TransactionManager transactionManager = new RawTransactionManager(web3,credentials, 50, 600);
 		
 		//Despliegue del contrato
         System.out.println("Despliegue del contrato : " + credentials.getAddress());
-        Huella_sol_Huella document = cuenta.deployContract(web3, transactionManager, contractGasProvider, credentials.getAddress(), new BigInteger("1"));
-        dirContrato = document.getContractAddress();
-        System.out.println("Documento : " + document.getContractAddress());
-        System.out.println("Documento : " + document.owner()); 
+        //Huella_sol_Huella document = cuenta.deployContract(web3, transactionManager, contractGasProvider, credentials.getAddress(), new BigInteger("1"));
+        //Huella_sol_Huella document = cuenta.deployContract(web3, transactionManager, contractGasProvider, owner, new BigInteger("1"));
+        Huella_sol_Huella document;
+		try {
+			document = Huella_sol_Huella.deploy(web3, transactionManager, contractGasProvider, owner, new BigInteger("1")).send();
+	        dirContrato = document.getContractAddress();
+	        System.out.println("Documento : " + document.getContractAddress());
+	        System.out.println("Documento : " + document.owner()); 
+		} catch (Exception e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
 
 		return dirContrato;
-		
+		//0xf6eb3116269103bb8bec3d130a471b567b21ff86
+		//0xbcdc6b18be15ef4e8a7184a1b4727ce9ef3bc310
 	}
 	
 	/************************************************************************/	
 	/* Añadir una huella nueva => 											*/
-	/* 1. Buscar el transporte correspondiente al dispositivo de la huella 	*/
-	/* 2. Actualizar campo transporte de la huella							*/
-	/* 3. Actualizar campo tramo de la huella								*/
-	/* 4. Guardar la huella													*/
-	/************************************************************************/
+	/* 1. Usar como propietario la PvKey que se recibe por parámetro 		*/
+	/* 2. Usar el contrato que se recibe por parámetro						*/
+	/* 3. Añadir la huella													*/
+	/************************************************************************/	
+
+	@PostMapping("/huella")
+	public String addhuella(@RequestBody String owner) {
+		System.out.println("Añadir huella: ");
+		Web3j web3 = obtenWeb3(URL);
+		Cuentas cuenta = new Cuentas();
+		Credentials credentials = cuenta.usarCuenta(owner);
+		Huella_sol_Huella document = new Huella_sol_Huella("0xbcdc6b18be15ef4e8a7184a1b4727ce9ef3bc310", web3, credentials, contractGasProvider); 		
+		TransactionReceipt transactionReceipt = cuenta.addHuella(document,
+				"$idhuella$: 98,$idtransporte$: 1,$idtramo$: 2,$longitud$: -3.577882,$latitud$: 40.453835,$altitud$: 600,$humedad$: 0.0,$temperatura$: 26.0,$movimientox$: 35.0,$movimientoy$: 29.0,$movimientoz$: 17.0,     $velocidad$: 83.0,$momento$: $2023-07-13 10:00:12$,$iddispositivo$: $1$");
+		System.out.println("TransactionReceipt: " + transactionReceipt.toString());
+		return transactionReceipt.toString();
+	}
 
 } 

@@ -70,7 +70,7 @@ public class Cuentas {
         try {
             document = Huella_sol_Huella.deploy(web3, transactionManager, contractGasProvider, owner, transportId).send();
         } catch (Exception e) {
-            LOG.log(Level.SEVERE,"Excepcines de despliegue :" + e.getMessage());
+            LOG.log(Level.SEVERE,"Excepciones de despliegue :" + e.getMessage());
             e.printStackTrace();
         }
         return document;
